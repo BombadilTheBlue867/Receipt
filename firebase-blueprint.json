@@ -1,0 +1,337 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User identity and profile preferences",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address",
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name",
+          "maxLength": 128
+        },
+        "currency": {
+          "type": "string",
+          "description": "Default currency code",
+          "maxLength": 3
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Account creation timestamp"
+        }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "PaymentMethod": {
+      "title": "PaymentMethod",
+      "description": "Stored credit card profile, perks, and reward multipliers",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "issuer": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "cardName": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "network": {
+          "type": "string",
+          "enum": ["Visa", "Mastercard", "Amex", "Discover"],
+          "maxLength": 32
+        },
+        "lastFour": {
+          "type": "string",
+          "maxLength": 4,
+          "pattern": "^[0-9]{4}$"
+        },
+        "extendedWarrantyMonths": {
+          "type": "number"
+        },
+        "maxOriginalWarrantyMonths": {
+          "type": "number"
+        },
+        "purchaseProtectionDays": {
+          "type": "number"
+        },
+        "purchaseProtectionMaxClaimUsd": {
+          "type": "number"
+        },
+        "returnProtectionDays": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "issuer",
+        "cardName",
+        "network",
+        "lastFour",
+        "extendedWarrantyMonths",
+        "purchaseProtectionDays",
+        "returnProtectionDays",
+        "createdAt"
+      ]
+    },
+    "Asset": {
+      "title": "Asset",
+      "description": "Purchased asset, warranty status, and receipt breakdown",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "brand": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "modelNumber": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "serialNumber": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "upcBarcode": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "subcategory": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "merchantName": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "purchaseDate": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "purchasePrice": {
+          "type": "number"
+        },
+        "taxAmount": {
+          "type": "number"
+        },
+        "shippingFee": {
+          "type": "number"
+        },
+        "recyclingFee": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "maxLength": 3
+        },
+        "paymentMethodId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "isDurableAsset": {
+          "type": "boolean"
+        },
+        "usageCount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Active", "Expiring Soon", "Claim in Progress", "Expired"],
+          "maxLength": 32
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "brand",
+        "category",
+        "merchantName",
+        "purchaseDate",
+        "purchasePrice",
+        "taxAmount",
+        "currency",
+        "paymentMethodId",
+        "isDurableAsset",
+        "usageCount",
+        "status",
+        "createdAt"
+      ]
+    },
+    "Claim": {
+      "title": "Claim",
+      "description": "Formal warranty, return, or credit card protection claim record",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assetId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assetName": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "incidentType": {
+          "type": "string",
+          "enum": [
+            "Hardware Defect",
+            "Normal Wear and Tear",
+            "Accidental Drop/Spill",
+            "Power Surge",
+            "Theft"
+          ],
+          "maxLength": 64
+        },
+        "incidentDate": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "diagnosticNotes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "selectedRoute": {
+          "type": "string",
+          "enum": [
+            "Retailer Return",
+            "Manufacturer RMA",
+            "Credit Card Extended Warranty",
+            "Credit Card Purchase Protection",
+            "Credit Card Return Protection"
+          ],
+          "maxLength": 64
+        },
+        "claimAmount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Draft", "Ready to Submit", "Submitted", "Approved", "Denied"],
+          "maxLength": 32
+        },
+        "dossierSummary": {
+          "type": "string",
+          "maxLength": 5000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "assetId",
+        "assetName",
+        "incidentType",
+        "incidentDate",
+        "diagnosticNotes",
+        "selectedRoute",
+        "claimAmount",
+        "status",
+        "dossierSummary",
+        "createdAt"
+      ]
+    },
+    "Budget": {
+      "title": "Budget",
+      "description": "Category monthly spending ceiling and alert threshold",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "monthlyLimit": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "maxLength": 3
+        },
+        "alertThresholdPercent": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "category",
+        "monthlyLimit",
+        "currency",
+        "alertThresholdPercent",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile document"
+    },
+    "/payment_methods/{methodId}": {
+      "schema": { "$ref": "#/entities/PaymentMethod" },
+      "description": "User stored credit cards and protection perks"
+    },
+    "/assets/{assetId}": {
+      "schema": { "$ref": "#/entities/Asset" },
+      "description": "Tracked assets and receipts"
+    },
+    "/claims/{claimId}": {
+      "schema": { "$ref": "#/entities/Claim" },
+      "description": "Generated RMA and credit card benefit claims"
+    },
+    "/budgets/{budgetId}": {
+      "schema": { "$ref": "#/entities/Budget" },
+      "description": "Category budget limits and alert thresholds"
+    }
+  }
+}

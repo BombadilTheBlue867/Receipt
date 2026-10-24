@@ -1,0 +1,223 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reusable Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 1. User Validation Blueprint
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+             data.keys().hasOnly(['uid', 'email', 'displayName', 'currency', 'createdAt']) &&
+             data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+             data.uid == request.auth.uid &&
+             data.email is string && data.email.size() >= 3 && data.email.size() <= 256 &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128)) &&
+             (!('currency' in data) || (data.currency is string && data.currency.size() == 3)) &&
+             data.createdAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isVerifiedUser() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if isVerifiedUser() && resource.data.uid == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(userId) && request.auth.uid == userId &&
+                    isValidUser(incoming()) && incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(userId) && request.auth.uid == userId &&
+                    isValidUser(incoming()) &&
+                    incoming().uid == existing().uid &&
+                    incoming().createdAt == existing().createdAt &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'currency']);
+      allow delete: if false;
+    }
+
+    // 2. PaymentMethod Validation Blueprint
+    function isValidPaymentMethod(data) {
+      return data.keys().hasAll([
+               'userId', 'issuer', 'cardName', 'network', 'lastFour',
+               'extendedWarrantyMonths', 'purchaseProtectionDays', 'returnProtectionDays', 'createdAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'issuer', 'cardName', 'network', 'lastFour',
+               'extendedWarrantyMonths', 'maxOriginalWarrantyMonths',
+               'purchaseProtectionDays', 'purchaseProtectionMaxClaimUsd',
+               'returnProtectionDays', 'createdAt'
+             ]) &&
+             data.userId is string && isValidId(data.userId) && data.userId == request.auth.uid &&
+             data.issuer is string && data.issuer.size() >= 1 && data.issuer.size() <= 64 &&
+             data.cardName is string && data.cardName.size() >= 1 && data.cardName.size() <= 128 &&
+             data.network in ['Visa', 'Mastercard', 'Amex', 'Discover'] &&
+             data.lastFour is string && data.lastFour.size() == 4 && data.lastFour.matches('^[0-9]{4}$') &&
+             data.extendedWarrantyMonths is number && data.extendedWarrantyMonths >= 0 && data.extendedWarrantyMonths <= 60 &&
+             (!('maxOriginalWarrantyMonths' in data) || (data.maxOriginalWarrantyMonths is number && data.maxOriginalWarrantyMonths >= 0)) &&
+             data.purchaseProtectionDays is number && data.purchaseProtectionDays >= 0 && data.purchaseProtectionDays <= 365 &&
+             (!('purchaseProtectionMaxClaimUsd' in data) || (data.purchaseProtectionMaxClaimUsd is number && data.purchaseProtectionMaxClaimUsd >= 0)) &&
+             data.returnProtectionDays is number && data.returnProtectionDays >= 0 && data.returnProtectionDays <= 365 &&
+             data.createdAt is timestamp;
+    }
+
+    match /payment_methods/{methodId} {
+      allow get: if isVerifiedUser() && isValidId(methodId) && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(methodId) &&
+                    isValidPaymentMethod(incoming()) && incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(methodId) &&
+                    existing().userId == request.auth.uid &&
+                    isValidPaymentMethod(incoming()) &&
+                    incoming().userId == existing().userId &&
+                    incoming().createdAt == existing().createdAt &&
+                    incoming().diff(existing()).affectedKeys().hasOnly([
+                      'cardName', 'extendedWarrantyMonths', 'purchaseProtectionDays', 'returnProtectionDays'
+                    ]);
+      allow delete: if isVerifiedUser() && isValidId(methodId) && existing().userId == request.auth.uid;
+    }
+
+    // 3. Asset Validation Blueprint
+    function isValidAsset(data) {
+      return data.keys().hasAll([
+               'userId', 'name', 'brand', 'category', 'merchantName', 'purchaseDate',
+               'purchasePrice', 'taxAmount', 'currency', 'paymentMethodId',
+               'isDurableAsset', 'usageCount', 'status', 'createdAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'name', 'brand', 'modelNumber', 'serialNumber', 'upcBarcode',
+               'category', 'subcategory', 'merchantName', 'purchaseDate',
+               'purchasePrice', 'taxAmount', 'shippingFee', 'recyclingFee',
+               'currency', 'paymentMethodId', 'isDurableAsset', 'usageCount', 'status', 'createdAt'
+             ]) &&
+             data.userId is string && isValidId(data.userId) && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 200 &&
+             data.brand is string && data.brand.size() >= 1 && data.brand.size() <= 100 &&
+             (!('modelNumber' in data) || (data.modelNumber is string && data.modelNumber.size() <= 100)) &&
+             (!('serialNumber' in data) || (data.serialNumber is string && data.serialNumber.size() <= 100)) &&
+             (!('upcBarcode' in data) || (data.upcBarcode is string && data.upcBarcode.size() <= 64)) &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 64 &&
+             (!('subcategory' in data) || (data.subcategory is string && data.subcategory.size() <= 64)) &&
+             data.merchantName is string && data.merchantName.size() >= 1 && data.merchantName.size() <= 128 &&
+             data.purchaseDate is string && data.purchaseDate.size() >= 8 && data.purchaseDate.size() <= 32 &&
+             data.purchasePrice is number && data.purchasePrice >= 0 &&
+             data.taxAmount is number && data.taxAmount >= 0 &&
+             (!('shippingFee' in data) || (data.shippingFee is number && data.shippingFee >= 0)) &&
+             (!('recyclingFee' in data) || (data.recyclingFee is number && data.recyclingFee >= 0)) &&
+             data.currency is string && data.currency.size() == 3 &&
+             data.paymentMethodId is string && data.paymentMethodId.size() >= 1 && data.paymentMethodId.size() <= 128 &&
+             data.isDurableAsset is bool &&
+             data.usageCount is number && data.usageCount >= 0 &&
+             data.status in ['Active', 'Expiring Soon', 'Claim in Progress', 'Expired'] &&
+             data.createdAt is timestamp;
+    }
+
+    match /assets/{assetId} {
+      allow get: if isVerifiedUser() && isValidId(assetId) && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(assetId) &&
+                    isValidAsset(incoming()) && incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(assetId) &&
+                    existing().userId == request.auth.uid &&
+                    isValidAsset(incoming()) &&
+                    incoming().userId == existing().userId &&
+                    incoming().createdAt == existing().createdAt &&
+                    (
+                      incoming().diff(existing()).affectedKeys().hasOnly(['usageCount']) ||
+                      incoming().diff(existing()).affectedKeys().hasOnly(['status']) ||
+                      incoming().diff(existing()).affectedKeys().hasOnly(['serialNumber', 'modelNumber', 'status', 'usageCount'])
+                    );
+      allow delete: if isVerifiedUser() && isValidId(assetId) && existing().userId == request.auth.uid;
+    }
+
+    // 4. Claim Validation Blueprint
+    function isValidClaim(data) {
+      return data.keys().hasAll([
+               'userId', 'assetId', 'assetName', 'incidentType', 'incidentDate',
+               'diagnosticNotes', 'selectedRoute', 'claimAmount', 'status', 'dossierSummary', 'createdAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'assetId', 'assetName', 'incidentType', 'incidentDate',
+               'diagnosticNotes', 'selectedRoute', 'claimAmount', 'status', 'dossierSummary', 'createdAt'
+             ]) &&
+             data.userId is string && isValidId(data.userId) && data.userId == request.auth.uid &&
+             data.assetId is string && isValidId(data.assetId) &&
+             data.assetName is string && data.assetName.size() >= 1 && data.assetName.size() <= 200 &&
+             data.incidentType in ['Hardware Defect', 'Normal Wear and Tear', 'Accidental Drop/Spill', 'Power Surge', 'Theft'] &&
+             data.incidentDate is string && data.incidentDate.size() >= 8 && data.incidentDate.size() <= 32 &&
+             data.diagnosticNotes is string && data.diagnosticNotes.size() >= 1 && data.diagnosticNotes.size() <= 2000 &&
+             data.selectedRoute in [
+               'Retailer Return', 'Manufacturer RMA',
+               'Credit Card Extended Warranty', 'Credit Card Purchase Protection', 'Credit Card Return Protection'
+             ] &&
+             data.claimAmount is number && data.claimAmount >= 0 &&
+             data.status in ['Draft', 'Ready to Submit', 'Submitted', 'Approved', 'Denied'] &&
+             data.dossierSummary is string && data.dossierSummary.size() >= 1 && data.dossierSummary.size() <= 5000 &&
+             data.createdAt is timestamp;
+    }
+
+    match /claims/{claimId} {
+      allow get: if isVerifiedUser() && isValidId(claimId) && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(claimId) &&
+                    isValidClaim(incoming()) && incoming().createdAt == request.time &&
+                    exists(/databases/$(database)/documents/assets/$(incoming().assetId)) &&
+                    get(/databases/$(database)/documents/assets/$(incoming().assetId)).data.userId == request.auth.uid;
+      allow update: if isVerifiedUser() && isValidId(claimId) &&
+                    existing().userId == request.auth.uid &&
+                    !(existing().status in ['Approved', 'Denied']) &&
+                    isValidClaim(incoming()) &&
+                    incoming().userId == existing().userId &&
+                    incoming().assetId == existing().assetId &&
+                    incoming().createdAt == existing().createdAt &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'diagnosticNotes', 'dossierSummary']);
+      allow delete: if isVerifiedUser() && isValidId(claimId) && existing().userId == request.auth.uid;
+    }
+
+    // 5. Budget Validation Blueprint
+    function isValidBudget(data) {
+      return data.keys().hasAll([
+               'userId', 'category', 'monthlyLimit', 'currency', 'alertThresholdPercent', 'createdAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'category', 'monthlyLimit', 'currency', 'alertThresholdPercent', 'createdAt'
+             ]) &&
+             data.userId is string && isValidId(data.userId) && data.userId == request.auth.uid &&
+             data.category is string && data.category.size() >= 1 && data.category.size() <= 64 &&
+             data.monthlyLimit is number && data.monthlyLimit > 0 && data.monthlyLimit <= 1000000 &&
+             data.currency is string && data.currency.size() == 3 &&
+             data.alertThresholdPercent is number && data.alertThresholdPercent >= 10 && data.alertThresholdPercent <= 100 &&
+             data.createdAt is timestamp;
+    }
+
+    match /budgets/{budgetId} {
+      allow get: if isVerifiedUser() && isValidId(budgetId) && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(budgetId) &&
+                    isValidBudget(incoming()) && incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(budgetId) &&
+                    existing().userId == request.auth.uid &&
+                    isValidBudget(incoming()) &&
+                    incoming().userId == existing().userId &&
+                    incoming().createdAt == existing().createdAt &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['monthlyLimit', 'alertThresholdPercent']);
+      allow delete: if isVerifiedUser() && isValidId(budgetId) && existing().userId == request.auth.uid;
+    }
+  }
+}

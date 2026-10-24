@@ -1,0 +1,6 @@
+{
+  "name": "ReceiptVault",
+  "description": "Privacy-first autonomous digital asset ledger, warranty policy engine, and automated RMA & credit card benefit claim assistant.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
